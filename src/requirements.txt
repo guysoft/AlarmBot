@@ -1,0 +1,7 @@
+croniter
+python-telegram-bot
+python-crontab
+pydub
+pyaudio
+cron-descriptor
+emoji
