@@ -42,4 +42,4 @@ Attribution
 alarm.mp3 is by `TheZero <https://freesound.org/people/TheZero/sounds/273540/>`_ under CC 1.0
 
 
-Code contribution are loved!
+Code contributions are loved!
