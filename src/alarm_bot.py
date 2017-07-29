@@ -24,6 +24,7 @@ import os
 import json
 import random
 import string
+from datetime import datetime
 import sys
 from alarm import ensure_dir
 
@@ -48,7 +49,7 @@ def ini_to_dict(path):
     return return_value
 
 
-def short_description(job):
+def short_description(job, use_24hour_time_format=True):
     replace_list = [["Sunday", "Sun"],
                     ["Monday", "Mon"],
                     ["Tuesday", "Tue"],
@@ -59,7 +60,7 @@ def short_description(job):
                     [" through ", "-"],
                     ["At", ""]]
 
-    description = str(get_description(str(job.slices)))
+    description = job.description(use_24hour_time_format=use_24hour_time_format)
     for r in replace_list:
         description = description.replace(r[0], r[1])
     return description.strip()
@@ -329,12 +330,12 @@ class Bot:
         for i, job in enumerate(self.crontab.job_list()):
             description = short_description(job).split(",")
 
-            icon = emojize(":alarm_clock:", use_aliases=True)
+            icon = emojize(":bell:", use_aliases=True)
             alarm_button = InlineKeyboardButton(icon, callback_data=build_callback(
                 {"command": "disable", "alarm": get_job_id(job)}))
 
             if not job.enabled:
-                icon = emojize(":mute:", use_aliases=True)
+                icon = emojize(":no_bell:", use_aliases=True)
                 alarm_button = InlineKeyboardButton(icon, callback_data=build_callback(
                     {"command": "enable","alarm": get_job_id(job)}))
 
@@ -368,14 +369,14 @@ class Bot:
             if data["command"] == "enable":
                 for alarm in self.crontab.job_list():
                     if data["alarm"] == get_job_id(alarm):
-                        reply = "enabling alarm: " + short_description(alarm)
+                        reply = emojize(":bell:", use_aliases=True) + " Enabling alarm: " + short_description(alarm)
                         self.crontab.enable(alarm)
                         break
 
             if data["command"] == "disable":
                 for alarm in self.crontab.job_list():
                     if data["alarm"] == get_job_id(alarm):
-                        reply = "disabling alarm: " + short_description(alarm)
+                        reply = emojize(":no_bell:", use_aliases=True) + " Disabling alarm: " + short_description(alarm)
                         self.crontab.disable(alarm)
                         break
 
