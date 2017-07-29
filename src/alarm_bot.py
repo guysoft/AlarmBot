@@ -124,6 +124,7 @@ class CronJobs:
         for job in self.cron:
             if job.comment.split(" ")[0] == self.cron_id:
                 return_value.append(job)
+        return_value.sort(key=lambda job: job.schedule().get_next(float))
         return return_value
 
     def get_readable_jobs(self):
