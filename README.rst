@@ -35,6 +35,10 @@ or::
     
 4. Message ``/start`` to your bot to set up alarms.
 
+Set up service on startup
+-------------------------
+Run ``src/add_startup_service.sh`` either as the user you want the service to be run as, or ``src/add_startup_service.sh <user to run script>``
+
 
 Attribution
 ~~~~~~~~~~~
