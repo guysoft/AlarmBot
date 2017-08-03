@@ -16,7 +16,6 @@ from emoji import emojize
 import logging
 import traceback
 from crontab import CronTab
-from cron_descriptor import get_description
 import signal
 from configparser import ConfigParser
 from collections import OrderedDict
@@ -24,8 +23,9 @@ import os
 import json
 import random
 import string
-from datetime import datetime
 import sys
+from urllib.request import urlopen, URLError
+import time
 from alarm import ensure_dir
 
 ALARM_COMMAND = os.path.abspath(os.path.join(os.path.dirname(__file__), "alarm.py"))
@@ -396,7 +396,21 @@ class Bot:
     def run(self):
         self.updater.start_polling()
         return
-        
+
+
+def check_connectivity(reference):
+    try:
+        urlopen(reference, timeout=1)
+        return True
+    except URLError:
+        return False
+
+
+def wait_for_internet():
+    while not check_connectivity("https://api.telegram.org"):
+        print("Waiting for internet")
+        time.sleep(1)
+
 
 if __name__ == "__main__":
     config_file_path = os.path.join(DIR, "config.ini")
@@ -406,6 +420,8 @@ if __name__ == "__main__":
         sys.exit(1)
     if ("main" not in settings) or ("token" not in settings["main"]):
         print("Error, no token in config file")
+
+    wait_for_internet()
 
     a = Bot(settings["main"]["token"])
     a.run()
