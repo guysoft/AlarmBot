@@ -26,6 +26,8 @@ import string
 import sys
 from urllib.request import urlopen, URLError
 import time
+import pytz
+import subprocess
 from alarm import ensure_dir
 
 ALARM_COMMAND = os.path.abspath(os.path.join(os.path.dirname(__file__), "alarm.py"))
@@ -46,6 +48,27 @@ def ini_to_dict(path):
         section_tuples = config.items(section)
         for itemTurple in reversed(section_tuples):
             return_value[section][itemTurple[0]] = itemTurple[1]
+    return return_value
+
+
+def run_command(command):
+    p = subprocess.Popen(command, shell=False, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    return [p.stdout.read().decode("utf-8"), p.stderr.read().decode("utf-8")]
+
+
+def get_timezones():
+    return_value = {}
+    for tz in pytz.common_timezones:
+        c = tz.split("/")
+        if len(c) > 1:
+            if c[0] not in return_value.keys():
+                return_value[c[0]] = []
+            return_value[c[0]].append(c[1])
+
+        for i in ["GMT"]:
+            if i in return_value.keys():
+                return_value.pop(i)
+
     return return_value
 
 
@@ -160,13 +183,22 @@ def get_job_id(job):
     except IndexError:
         print(str(traceback.format_exc()))
         return None
-            
+
+
+def handle_cancel(update):
+    query = update.message.text
+    if query == "Close" or query == "/cancel":
+        reply = "Perhaps another time"
+        update.message.reply_text(reply)
+        return reply
+    return None
 
 class Bot:
     def __init__(self, token):
 
         self.crontab = CronJobs("alarmbot")
         self.selected_alarm_type = ""
+        self.selected_continent = ""
         logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s', level=logging.INFO)
 
         self.updater = Updater(token=token)
@@ -174,19 +206,33 @@ class Bot:
         start_handler = CommandHandler('start', self.start)
         self.dispatcher.add_handler(start_handler)
 
-        self.ALARM_TYPE, self.DAILY, self.WEEKDAY, self.HOUR, self.TYPE = range(5)
+        self.ALARM_TYPE, self.ALARM_HOUR = range(2)
+
+        self.TIMEZONE_CONTINENT, self.TIMEZONE_TIME = range(2)
 
         # Add conversation handler with the states ALARM_TYPE, DAILY, WEEKDAY, HOUR
         new_alarm_handler = ConversationHandler(
             entry_points=[CommandHandler('new', self.new_alarm)],
             states={
-                self.TYPE: [RegexHandler('^(Daily|Weekday Only|Close|/cancel)$', self.alarm_type)],
+                self.ALARM_TYPE: [RegexHandler('^(Daily|Weekday Only|Close|/cancel)$', self.alarm_type)],
 
-                self.HOUR: [RegexHandler('^([0-2][0-9]:[0-5][0-9]|[0-9]:[0-5][0-9]|/cancel)$', self.hour)]
+                self.ALARM_HOUR: [RegexHandler('^([0-2][0-9]:[0-5][0-9]|[0-9]:[0-5][0-9]|/cancel)$', self.hour)]
             },
             fallbacks=[CommandHandler('cancel', self.cancel)]
         )
         self.dispatcher.add_handler(new_alarm_handler)
+
+        # Add conversation handler with the states ALARM_TYPE, DAILY, WEEKDAY, HOUR
+        set_timezone_handler = ConversationHandler(
+            entry_points=[CommandHandler('timezone', self.set_timezone)],
+            states={
+                self.TIMEZONE_CONTINENT: [RegexHandler('^(' + "|".join(get_timezones().keys()) + '|/cancel)$', self.timezone_continent)],
+
+                self.TIMEZONE_TIME: [RegexHandler('^(.*)$', self.timezone_time)]
+            },
+            fallbacks=[CommandHandler('cancel', self.cancel)]
+        )
+        self.dispatcher.add_handler(set_timezone_handler)
 
         stop_handler = CommandHandler('stop', self.stop_alarms)
         self.dispatcher.add_handler(stop_handler)
@@ -218,7 +264,41 @@ class Bot:
         reply_markup = ReplyKeyboardMarkup(keyboard, one_time_keyboard=True)
         
         update.message.reply_text('Select type of alarm, or /cancel to cancel:', reply_markup=reply_markup)
-        return self.TYPE
+        return self.ALARM_TYPE
+
+    def set_timezone(self, bot, update):
+        keyboard = []
+
+        for continent in sorted(get_timezones().keys()):
+            keyboard.append([InlineKeyboardButton(continent)])
+
+        reply_markup = ReplyKeyboardMarkup(keyboard, one_time_keyboard=True)
+        update.message.reply_text('Please select a continent, or /cancel to cancel:', reply_markup=reply_markup)
+        return self.TIMEZONE_CONTINENT
+
+    def timezone_continent(self, bot, update):
+        reply = handle_cancel(update)
+        if reply is None:
+            keyboard = []
+            self.selected_continent = update.message.text
+            for continent in sorted(get_timezones()[self.selected_continent]):
+                keyboard.append([InlineKeyboardButton(continent)])
+            reply_markup = ReplyKeyboardMarkup(keyboard, one_time_keyboard=True)
+            update.message.reply_text('Please select a timezone, or /cancel to cancel:', reply_markup=reply_markup)
+
+            return self.TIMEZONE_TIME
+        return ConversationHandler.END
+
+    def timezone_time(self, bot, update):
+        reply = handle_cancel(update)
+        if reply is None:
+            timezone = self.selected_continent + "/" + update.message.text
+
+            print(run_command(["sudo", os.path.join(DIR, "set_timezone.sh"), timezone]))
+
+            update.message.reply_text('Timezone set set to: ' + timezone)
+            return ConversationHandler.END
+        return ConversationHandler.END
 
     def alarm_type(self, bot, update):
         query = update.message.text
@@ -228,9 +308,8 @@ class Bot:
             self.selected_alarm_type = update.message.text
             reply = "Selected daily alarm, type time in format hh:mm, for example: 8:00 or 20:00:"
             update.message.reply_text(reply)
-            return self.HOUR
-        if query == "Close" or query == "/cancel":
-            reply = "Perhaps another time"
+            return self.ALARM_HOUR
+        reply = handle_cancel(update)
 
         update.message.reply_text(reply)
         return ConversationHandler.END
@@ -271,7 +350,7 @@ class Bot:
             print(str(traceback.format_exc()))
             reply = "Error, not valid format"
             update.message.reply_text(reply)
-            return self.TYPE
+            return self.ALARM_TYPE
         return ConversationHandler.END
 
     def error_callback(self, bot, update, error):

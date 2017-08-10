@@ -5,3 +5,4 @@ pydub
 pyaudio
 cron-descriptor
 emoji
+pytz
