@@ -51,9 +51,12 @@ def ini_to_dict(path):
     return return_value
 
 
-def run_command(command):
+def run_command(command, blocking=True):
     p = subprocess.Popen(command, shell=False, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-    return [p.stdout.read().decode("utf-8"), p.stderr.read().decode("utf-8")]
+
+    if blocking:
+        return [p.stdout.read().decode("utf-8"), p.stderr.read().decode("utf-8")]
+    return
 
 
 def get_timezones():
@@ -243,6 +246,12 @@ class Bot:
         list_handler = CommandHandler('list', self.list_alarms)
         self.dispatcher.add_handler(list_handler)
 
+        time_handler = CommandHandler('time', self.time)
+        self.dispatcher.add_handler(time_handler)
+
+        test_handler = CommandHandler('test', self.test)
+        self.dispatcher.add_handler(test_handler)
+
         self.dispatcher.add_handler(CallbackQueryHandler(self.button))
 
         self.dispatcher.add_error_handler(self.error_callback)
@@ -294,9 +303,14 @@ class Bot:
         if reply is None:
             timezone = self.selected_continent + "/" + update.message.text
 
-            print(run_command(["sudo", os.path.join(DIR, "set_timezone.sh"), timezone]))
+            timezone_script = os.path.join(DIR, "set_timezone.sh")
 
-            update.message.reply_text('Timezone set set to: ' + timezone)
+            if os.path.isfile(os.path.join("/usr/share/zoneinfo/", timezone)):
+                print(run_command(["sudo", timezone_script, timezone]))
+                update.message.reply_text(emojize(":clock4: ", use_aliases=True) + 'Timezone set set to: ' + timezone)
+            else:
+                update.message.reply_text(emojize(":no_entry_sign: ", use_aliases=True) + 'Timezone file does not exist: ' + timezone)
+
             return ConversationHandler.END
         return ConversationHandler.END
 
@@ -383,6 +397,9 @@ class Bot:
         commands = [["/new", "Create new alarm"],
                     ["/list", "List alarms, enable/disable and remove alarms"],
                     ["/stop", "Stop all alarms"],
+                    ["/timezone", "Set the timezone (only works if sudo requires no password)"],
+                    ["/test", "Play an alarm to test"],
+                    ["/time", "Print time and timezone on device"],
                     ["/help", "Get this message"]
                     ]
 
@@ -390,7 +407,18 @@ class Bot:
             text += command[0] + " " + command[1] + "\n"
 
         bot.send_message(chat_id=update.message.chat_id, text=text)
-    
+
+    def time(self, bot, update):
+        reply, _ = run_command(["date"])
+        bot.send_message(chat_id=update.message.chat_id, text=reply)
+        return
+
+    def test(self, bot, update):
+        run_command([ALARM_COMMAND, os.path.abspath(os.path.join(DIR, "alarm.mp3"))], False)
+        reply = "Testing alarm! Send /stop to stop"
+        bot.send_message(chat_id=update.message.chat_id, text=reply)
+        return
+
     def stop_alarms(self, bot, update):
         alarm_folder = os.path.expanduser(os.path.join("~", ".alarmbot"))
         ensure_dir(alarm_folder)
@@ -399,7 +427,7 @@ class Bot:
             try:
                 pid = int(lock_file.split(".lock")[0])
                 os.kill(pid, signal.SIGINT)
-            except ValueError:
+            except (ValueError, ProcessLookupError):
                  pass
         bot.send_message(chat_id=update.message.chat_id, text="Stopping alarm!")
         return
