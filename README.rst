@@ -9,11 +9,13 @@ Requirements
 * Python3 (and pip probably)
 * `python-telegram-bot <https://github.com/python-telegram-bot/python-telegram-bot>`_ (7.0.1+)
 * `pyaudio <https://people.csail.mit.edu/hubert/pyaudio>`_
+* `pulseaudio <https://www.freedesktop.org/wiki/Software/PulseAudio/>`_  (or anything pyaudio compatible)
 * `pydub <https://github.com/jiaaro/pydub>`_
 * `python-crontab <https://github.com/doctormo/python-crontab>`_
 * `cron-descriptor <https://github.com/Salamek/cron-descriptor>`_
 * `croniter <https://github.com/kiorky/croniter>`_
 * `emoji <https://github.com/carpedm20/emoji>`_
+
 
 How to use it?
 --------------
