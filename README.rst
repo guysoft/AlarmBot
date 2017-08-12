@@ -24,7 +24,7 @@ How to use it?
     
 or::
 
-    sudo apt-get install -y python3-pip ffmpeg libavcodec-extra python3-pyaudio
+    sudo apt-get install -y python3-pip ffmpeg libavcodec-extra python3-pyaudio pulseaudio
     sudo pip3 install -r src/requirements.txt
 
 2. Set copy config.ini.example to config ini and add there your bot's token. You can get a bot token by sending ``/newbot`` to `@BotFather <https://telegram.me/BotFather>`_
