@@ -16,6 +16,10 @@ Requirements
 * `croniter <https://github.com/kiorky/croniter>`_
 * `emoji <https://github.com/carpedm20/emoji>`_
 
+How does it look?
+-----------------
+
+`Here is a blog post about this <https://guysoft.wordpress.com/alarmpi/>`_, with even more install and usage instructions.
 
 How to use it?
 --------------
