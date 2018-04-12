@@ -71,6 +71,7 @@ def set_app_db(a):
     a.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
     return
 
+
 set_app_db(app)
 
 db = SQLAlchemy(app)
@@ -107,12 +108,13 @@ class AppConfig(Base):
     id = db.Column(db.Integer, primary_key=True)
     secret = db.Column(db.BINARY(SECRET_LENGTH), unique=True)
 
-    def __init__(self,id , secret):
+    def __init__(self, id , secret):
         self.id = id
         self.secret = secret
 
     def __repr__(self):
         return "%d/%s/%s" % (self.id, self.name)
+
 
 def init_db(uri):
     """
@@ -171,7 +173,8 @@ def update_role():
     user_id = content["user"]
     role = content["role"]
     update_user_role(user_id, role)
-    return json.dumps({'success':True});
+    return json.dumps({'success': True})
+
 
 @app.route('/login', methods=['GET', 'POST'])
 def login():
@@ -206,12 +209,13 @@ def page_not_found(e):
 @login_manager.user_loader
 def load_user(user_id):
     return User.query.get(int(user_id))
-### Login stuff ###
+
 
 def run():
     settings = get_config()
     app.run(debug=debug, host='0.0.0.0', port=int(settings["webserver"]["port"]), threaded=True)
     return
+
 
 def get_telegram_user_list():
     engine = create_engine(app.config["SQLALCHEMY_DATABASE_URI"])
@@ -222,6 +226,7 @@ def get_telegram_user_list():
     session = Session()
 
     return session.query(TelegramUser)
+
 
 def update_user_role(telegram_id, role):
     """
@@ -238,6 +243,7 @@ def update_user_role(telegram_id, role):
     session.query(TelegramUser).filter(TelegramUser.id == telegram_id).update({"role": role})
     session.commit()
     return
+
 
 if __name__ == "__main__":
     init_db(app)
