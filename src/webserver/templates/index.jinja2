@@ -1,0 +1,67 @@
+{% extends "bootstrap/base.html" %}
+{% block title %}AlarmBot - Control access for Telegram users{% endblock %}
+{% block content %}
+<script src="https://ajax.googleapis.com/ajax/libs/jquery/2.1.1/jquery.min.js"></script>
+<script type="text/javascript">
+function process_selection(theObj){
+    function toggleAlert(){
+    $(".alert").toggleClass('in out');
+    return false; // Keep close.bs.alert event from removing from DOM
+    }
+
+    $(function() {
+        var user = theObj.id.split("_")[1];
+        var role = theObj.value;
+
+        $.ajax({
+            url: '/update_role',
+            data: JSON.stringify({user: user, role: role}),
+            contentType: "application/json; charset=utf-8",
+            dataType: "json",
+            type: 'POST',
+            success: function(response) {
+                //alert(JSON.stringify(response["role"]));
+                var name = $('#' + user + "_name").html();
+                message = '<div class="alert alert-success">\n' +
+                    '<a href="#" class="close" data-dismiss="alert" aria-label="close">&times;</a>\n' +
+                    'Set role for ' + name + " as " + role + '</div>';
+
+                $('#messages').prepend(message);
+
+            },
+            error: function(error) {
+                message = '<div class="alert alert-danger">\n' +
+                    '<a href="#" class="close" data-dismiss="alert" aria-label="close">&times;</a>\n' +
+                    'An error has occurred: ' + JSON.stringify(response) + '</div>';
+
+                $('#messages').prepend(message);
+                console.log(error);
+            }
+        });
+    ;
+});
+}
+</script>
+
+
+    <div class="container-fluid">
+        <h1>List of users</h1><br/>
+        <div class="alert alert-info">Here is a list of users that messeged the bot, you can change who has access to control it</div><br/>
+        <table id="for-chart" class="table-striped" style="width: 100%;">
+        <tr><td>id</td><td>name</td><td>role</td></tr>
+        {% for user in users %}
+            <tr>
+            <td>{{ user["id"] }}</td><td><div id="{{ user["id"] }}_name">{{ user["name"] }}</div></td><td>
+            {% set roles=["guest", "admin"] %}
+            <select class="form-control" name="user_role_select" id="userroleselect_{{ user["id"] }}" onchange="process_selection(this)">
+                {% for role in roles %}
+                    <option value="{{ role }}" {% if user["role"] == role %}selected{% endif %}>{{ role }}</option>
+                {% endfor %}
+            </select>
+            </td></tr>
+        {% endfor %}
+        </table>
+    <div id="messages"></div>
+    </div>
+{% endblock %}
+

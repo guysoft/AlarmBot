@@ -24,11 +24,18 @@ import json
 import random
 import string
 import sys
+from functools import wraps
 from urllib.request import urlopen, URLError
 import time
 import pytz
 import subprocess
 from alarm import ensure_dir
+from database import TelegramUser
+from sqlalchemy.orm import sessionmaker
+from sqlalchemy import create_engine
+from functools import wraps, partial
+
+debug = 'DEBUG' in os.environ and os.environ['DEBUG'] == "on"
 
 ALARM_COMMAND = os.path.abspath(os.path.join(os.path.dirname(__file__), "alarm.py"))
 DIR = os.path.dirname(__file__)
@@ -97,6 +104,43 @@ def get_id(existing_ids=[]):
     if new_id in existing_ids:
         return get_id(existing_ids)
     return new_id
+
+
+def has_access(engine, telegram_id, roles):
+    Session = sessionmaker()
+    Session.configure(bind=engine)
+    session = Session()
+    result = session.query(TelegramUser).filter(TelegramUser.id == telegram_id).first()
+    return result.role in roles
+
+def has_user(engine, telegram_id):
+    Session = sessionmaker()
+    Session.configure(bind=engine)
+    session = Session()
+    result = session.query(TelegramUser).filter(TelegramUser.id == telegram_id).count()
+    return result == 1
+
+
+def restricted(func=None, *, roles=["user", "admin"]):
+    if func is None:
+        return partial(restricted, roles=roles)
+
+    @wraps(func)
+    def wrapper(*args, **kwargs):
+        self = args[0]
+        bot = args[1]
+        update = args[2]
+
+        user_id = update.effective_user.id
+        if not has_access(self.engine, user_id, roles):
+            bot.send_message(chat_id=update.message.chat_id,
+                             text="You have no permission to use this command, use web UI to give authorization.",
+                             reply_to_message_id=update.message.message_id)
+            return
+        return func(*args, **kwargs)
+    return wrapper
+
+
 
 
 class TelegramCallbackError(Exception):
@@ -196,8 +240,20 @@ def handle_cancel(update):
         return reply
     return None
 
+
+def insert_new_user_to_db(engine, telegram_id, name, role="guest"):
+    Session = sessionmaker()
+    Session.configure(bind=engine)
+    session = Session()
+    entry = TelegramUser(id=telegram_id, name=name, role=role)
+    session.add(entry)
+    session.commit()
+    return
+
 class Bot:
-    def __init__(self, token):
+    def __init__(self, token, settings):
+
+        self.engine = create_engine(get_uri(settings))
 
         self.crontab = CronJobs("alarmbot")
         self.selected_alarm_type = ""
@@ -260,9 +316,14 @@ class Bot:
         # self.dispatcher.add_handler(echo_handler)
 
         return
+        return
 
     def start(self, bot, update):
-        bot.send_message(chat_id=update.message.chat_id, text="I'm an alarm bot bot, please type /help for info")
+        bot.send_message(chat_id=update.message.chat_id, text="I'm an alarm bot, please type /help for info")
+        if not has_user(self.engine, update.message.from_user.id):
+            insert_new_user_to_db(self.engine, update.message.from_user.id, update.message.from_user.full_name)
+        bot.send_message(chat_id=update.message.chat_id,
+                         text="Please add yourself as an admin in the web interface to control the bot")
         return
     
     def new_alarm(self, bot, update):
@@ -275,6 +336,7 @@ class Bot:
         update.message.reply_text('Select type of alarm, or /cancel to cancel:', reply_markup=reply_markup)
         return self.ALARM_TYPE
 
+    @restricted
     def set_timezone(self, bot, update):
         keyboard = []
 
@@ -408,17 +470,20 @@ class Bot:
 
         bot.send_message(chat_id=update.message.chat_id, text=text)
 
+    @restricted
     def time(self, bot, update):
         reply, _ = run_command(["date"])
         bot.send_message(chat_id=update.message.chat_id, text=reply)
         return
 
+    @restricted
     def test(self, bot, update):
         run_command([ALARM_COMMAND, os.path.abspath(os.path.join(DIR, "alarm.mp3"))], False)
         reply = "Testing alarm! Send /stop to stop"
         bot.send_message(chat_id=update.message.chat_id, text=reply)
         return
 
+    @restricted
     def stop_alarms(self, bot, update):
         alarm_folder = os.path.expanduser(os.path.join("~", ".alarmbot"))
         ensure_dir(alarm_folder)
@@ -431,7 +496,8 @@ class Bot:
                  pass
         bot.send_message(chat_id=update.message.chat_id, text="Stopping alarm!")
         return
-    
+
+    @restricted
     def list_alarms(self, bot, update):
         keyboard = []
 
@@ -519,17 +585,32 @@ def wait_for_internet():
         time.sleep(1)
 
 
+def mysql_init_db(uri, settings):
+    mysql_engine = create_engine(uri)
+    mysql_engine.execute("CREATE DATABASE IF NOT EXISTS {0} ".format(settings["db"]["db_name"]))
+    return
+
 if __name__ == "__main__":
-    config_file_path = os.path.join(DIR, "config.ini")
-    settings = ini_to_dict(config_file_path)
-    if not config_file_path:
+    from common import get_config, CONFIG_PATH, get_uri_without_db, get_uri
+    from webserver import webserver
+
+    settings = get_config()
+
+    mysql_init_db(get_uri_without_db(settings), settings)
+    webserver.init_db(get_uri(settings))
+
+    if not CONFIG_PATH:
         print("Error, no config file")
         sys.exit(1)
+
     if ("main" not in settings) or ("token" not in settings["main"]):
         print("Error, no token in config file")
 
     wait_for_internet()
 
-    a = Bot(settings["main"]["token"])
+    a = Bot(settings["main"]["token"], settings)
     a.run()
     print("Bot Started")
+
+    webserver.run()
+    print("Webserver started")

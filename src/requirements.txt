@@ -6,3 +6,13 @@ pyaudio
 cron-descriptor
 emoji
 pytz
+Flask
+flask-bootstrap
+wtforms
+sqlalchemy
+werkzeug
+flask-login
+flask-bootstrap
+flask-sqlalchemy
+flask_wtf
+mysql-connector-python-rf
