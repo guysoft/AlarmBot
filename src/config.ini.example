@@ -8,6 +8,6 @@ init_password=1234
 [db]
 host=127.0.0.1
 port=3306
-user=root
-password=password
+user=pi
+password=raspberry
 db_name=alarm_bot
