@@ -1,5 +1,6 @@
 [Unit]
 Description=AlarmBot Server
+After=mysql.service
 [Service]
 ExecStart=/bin/bash -c '/usr/bin/python3 SERVER_PLACEHOLDER  > LOG_PLACEHOLDER 2>&1'
 [Install]
