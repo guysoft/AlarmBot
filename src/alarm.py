@@ -15,6 +15,7 @@ import threading
 import pyaudio
 from pydub import AudioSegment
 from pydub.utils import make_chunks
+from alarm_bot import ensure_dir
 
 
 def touch(fname, mode=0o666, dir_fd=None, **kwargs):
@@ -22,11 +23,6 @@ def touch(fname, mode=0o666, dir_fd=None, **kwargs):
     with os.fdopen(os.open(fname, flags=flags, mode=mode, dir_fd=dir_fd)) as f:
         os.utime(f.fileno() if os.utime in os.supports_fd else fname,
                  dir_fd=None if os.supports_fd else dir_fd, **kwargs)
-
-
-def ensure_dir(d):
-    if not os.path.exists(d):
-        os.makedirs(d)
 
 
 class GracefulKiller:

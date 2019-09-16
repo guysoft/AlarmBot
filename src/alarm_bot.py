@@ -29,7 +29,6 @@ from urllib.request import urlopen, URLError
 import time
 import pytz
 import subprocess
-from alarm import ensure_dir
 from database import TelegramUser
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy import create_engine
@@ -39,6 +38,11 @@ debug = 'DEBUG' in os.environ and os.environ['DEBUG'] == "on"
 
 ALARM_COMMAND = os.path.abspath(os.path.join(os.path.dirname(__file__), "alarm.py"))
 DIR = os.path.dirname(__file__)
+
+
+def ensure_dir(d):
+    if not os.path.exists(d):
+        os.makedirs(d)
 
 
 def ini_to_dict(path):
